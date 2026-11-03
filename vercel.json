@@ -1,4 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "if [ \"$VERCEL_ENV\" = \"production\" ]; then pnpm db:migrate; fi && pnpm build"
+  "buildCommand": "if [ \"$VERCEL_ENV\" = \"production\" ] && [ -n \"$DATABASE_URL\" ]; then pnpm db:migrate; fi && pnpm build"
 }
