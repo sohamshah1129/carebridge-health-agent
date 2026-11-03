@@ -1,0 +1,346 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  DOCTOR
+  FRONT_DESK
+  BILLING
+  PATIENT
+}
+
+enum AppointmentStatus {
+  BOOKED
+  CONFIRMED
+  CHECKED_IN
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ReminderChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+enum ReminderStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum PreAuthStatus {
+  DRAFT
+  SUBMITTED
+  QUERY_RAISED
+  APPROVED
+  REJECTED
+  ENHANCEMENT
+}
+
+enum ClaimStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  QUERY_RAISED
+  APPROVED
+  REJECTED
+  SETTLED
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  CANCELLED
+}
+
+enum ConsentType {
+  INTAKE
+  MESSAGING
+  DATA_PROCESSING
+}
+
+enum EscalationStatus {
+  OPEN
+  ACKNOWLEDGED
+  CLOSED
+}
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  role         Role       @default(FRONT_DESK)
+  patientId    String?    @unique
+  patient      Patient?   @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  auditLogs    AuditLog[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Patient {
+  id                String              @id @default(cuid())
+  firstName         String
+  lastName          String
+  email             String?             @unique
+  phone             String              @unique
+  dateOfBirth       DateTime?
+  sex               String?
+  encryptedNotes    String?
+  consentedAt       DateTime?
+  messagingOptInAt  DateTime?
+  messagingOptOutAt DateTime?
+  user              User?
+  appointments      Appointment[]
+  intakeForms       IntakeForm[]
+  reminders         Reminder[]
+  policies          Policy[]
+  eligibility       EligibilityCheck[]
+  preAuths          PreAuth[]
+  claims            Claim[]
+  messages          Message[]
+  campaignTargets   CampaignRecipient[]
+  auditLogs         AuditLog[]
+  escalations       Escalation[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([lastName, firstName])
+}
+
+model Doctor {
+  id           String        @id @default(cuid())
+  name         String
+  specialty    String
+  email        String        @unique
+  active       Boolean       @default(true)
+  slots        Slot[]
+  appointments Appointment[]
+  createdAt    DateTime      @default(now())
+}
+
+model Slot {
+  id          String       @id @default(cuid())
+  doctorId    String
+  doctor      Doctor       @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  startsAt    DateTime
+  endsAt      DateTime
+  isAvailable Boolean      @default(true)
+  appointment Appointment?
+  createdAt   DateTime     @default(now())
+
+  @@unique([doctorId, startsAt])
+  @@index([startsAt, isAvailable])
+}
+
+model Appointment {
+  id              String            @id @default(cuid())
+  patientId       String
+  patient         Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId        String
+  doctor          Doctor            @relation(fields: [doctorId], references: [id])
+  slotId          String            @unique
+  slot            Slot              @relation(fields: [slotId], references: [id])
+  status          AppointmentStatus @default(BOOKED)
+  reasonEncrypted String?
+  idempotencyKey  String?           @unique
+  reminders       Reminder[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([patientId, status])
+  @@index([doctorId, createdAt])
+}
+
+model IntakeForm {
+  id                       String   @id @default(cuid())
+  patientId                String
+  patient                  Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  symptomsEncrypted        String
+  allergiesEncrypted       String?
+  medicationsEncrypted     String?
+  medicalHistoryEncrypted  String?
+  insuranceNumberEncrypted String?
+  consent                  Boolean  @default(false)
+  submittedAt              DateTime @default(now())
+
+  @@index([patientId, submittedAt])
+}
+
+model Reminder {
+  id             String          @id @default(cuid())
+  patientId      String
+  patient        Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointmentId  String?
+  appointment    Appointment?    @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  channel        ReminderChannel
+  status         ReminderStatus  @default(PENDING)
+  scheduledAt    DateTime
+  sentAt         DateTime?
+  idempotencyKey String          @unique
+  createdAt      DateTime        @default(now())
+
+  @@index([status, scheduledAt])
+}
+
+model Campaign {
+  id          String              @id @default(cuid())
+  name        String
+  message     String
+  status      CampaignStatus      @default(DRAFT)
+  scheduledAt DateTime?
+  recipients  CampaignRecipient[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+model CampaignRecipient {
+  id         String    @id @default(cuid())
+  campaignId String
+  campaign   Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  patientId  String
+  patient    Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  sentAt     DateTime?
+  optedOutAt DateTime?
+
+  @@unique([campaignId, patientId])
+  @@index([patientId, optedOutAt])
+}
+
+model Insurer {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  active    Boolean  @default(true)
+  policies  Policy[]
+  createdAt DateTime @default(now())
+}
+
+model Policy {
+  id                    String             @id @default(cuid())
+  patientId             String
+  patient               Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  insurerId             String
+  insurer               Insurer            @relation(fields: [insurerId], references: [id])
+  policyNumberEncrypted String
+  policyNumberHash      String
+  sumInsured            Decimal            @db.Decimal(12, 2)
+  coPayPercent          Decimal            @default(0) @db.Decimal(5, 2)
+  active                Boolean            @default(true)
+  eligibility           EligibilityCheck[]
+  preAuths              PreAuth[]
+  claims                Claim[]
+
+  @@unique([insurerId, policyNumberHash])
+  @@index([patientId, active])
+}
+
+model EligibilityCheck {
+  id           String   @id @default(cuid())
+  patientId    String
+  patient      Patient  @relation(fields: [patientId], references: [id])
+  policyId     String
+  policy       Policy   @relation(fields: [policyId], references: [id])
+  eligible     Boolean
+  checkedAt    DateTime @default(now())
+  responseCode String?
+
+  @@index([patientId, checkedAt])
+}
+
+model PreAuth {
+  id              String        @id @default(cuid())
+  patientId       String
+  patient         Patient       @relation(fields: [patientId], references: [id])
+  policyId        String
+  policy          Policy        @relation(fields: [policyId], references: [id])
+  status          PreAuthStatus @default(DRAFT)
+  requestedAmount Decimal       @db.Decimal(12, 2)
+  history         Json          @default("[]")
+  claims          Claim[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([status, createdAt])
+}
+
+model Claim {
+  id            String          @id @default(cuid())
+  patientId     String
+  patient       Patient         @relation(fields: [patientId], references: [id])
+  policyId      String
+  policy        Policy          @relation(fields: [policyId], references: [id])
+  preAuthId     String?
+  preAuth       PreAuth?        @relation(fields: [preAuthId], references: [id])
+  status        ClaimStatus     @default(DRAFT)
+  claimedAmount Decimal         @db.Decimal(12, 2)
+  settledAmount Decimal?        @db.Decimal(12, 2)
+  documents     ClaimDocument[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([status, createdAt])
+}
+
+model ClaimDocument {
+  id          String   @id @default(cuid())
+  claimId     String
+  claim       Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  fileName    String
+  storageKey  String   @unique
+  contentType String
+  uploadedAt  DateTime @default(now())
+
+  @@index([claimId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  patientId String?
+  patient   Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  direction String
+  channel   String   @default("CHAT")
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([patientId, createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  patientId  String?
+  patient    Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  action     String
+  resource   String
+  resourceId String?
+  ipHash     String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([patientId, createdAt])
+}
+
+model Escalation {
+  id             String           @id @default(cuid())
+  patientId      String?
+  patient        Patient?         @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  reasonCode     String
+  status         EscalationStatus @default(OPEN)
+  createdAt      DateTime         @default(now())
+  acknowledgedAt DateTime?
+
+  @@index([status, createdAt])
+}

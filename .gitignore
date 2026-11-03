@@ -1,0 +1,11 @@
+.env
+.venv/
+.next/
+node_modules/
+.pnpm-store/
+coverage/
+dist/
+.turbo/
+playwright-report/
+test-results/
+*.tsbuildinfo

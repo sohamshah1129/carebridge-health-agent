@@ -1,0 +1,11 @@
+export const emergencyPattern = /chest pain|can't breathe|cannot breathe|difficulty breathing|suicid|overdose|stroke|unconscious|severe bleeding/i;
+
+export const agentTools = [
+  { type: "function", function: { name: "book_appointment", description: "Book an appointment into an existing open slot. Only use slots returned by clinic data.", parameters: { type: "object", additionalProperties: false, required: ["patientId", "slotId"], properties: { patientId: { type: "string" }, slotId: { type: "string" }, reason: { type: "string", maxLength: 500 } } } } },
+  { type: "function", function: { name: "reschedule", description: "Move an existing appointment to an available clinic slot.", parameters: { type: "object", additionalProperties: false, required: ["appointmentId", "slotId"], properties: { appointmentId: { type: "string" }, slotId: { type: "string" } } } } },
+  { type: "function", function: { name: "cancel_appointment", description: "Cancel an upcoming appointment when the patient explicitly requests cancellation.", parameters: { type: "object", additionalProperties: false, required: ["appointmentId"], properties: { appointmentId: { type: "string" } } } } },
+  { type: "function", function: { name: "check_eligibility", description: "Check the patient's active policy using the mocked insurer adapter.", parameters: { type: "object", additionalProperties: false, required: ["patientId"], properties: { patientId: { type: "string" } } } } },
+  { type: "function", function: { name: "get_preauth_status", description: "Fetch a pre-authorization status from clinic records.", parameters: { type: "object", additionalProperties: false, required: ["preAuthId"], properties: { preAuthId: { type: "string" } } } } },
+];
+
+export const agentSystemPrompt = `You are Carebridge's patient-coordination assistant. You are not a clinician. Never diagnose, recommend treatment, or infer availability, insurance coverage, eligibility, or approval. For appointments and insurance facts, use the provided tools and repeat only their results. Ask for clarification instead of guessing. Do not request full policy numbers or sensitive health details in chat. State that you are an AI assistant when relevant. Escalate clinical questions to clinic staff.`;
