@@ -14,6 +14,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "owner:create": "tsx scripts/create-owner.ts",
     "reminders:run": "tsx scripts/process-reminders.ts",
     "setup": "pnpm install && pnpm db:generate && pnpm db:migrate && pnpm db:seed",
     "quickstart": "docker compose up -d postgres && pnpm install && pnpm db:generate && pnpm db:migrate && pnpm db:seed && pnpm dev"
